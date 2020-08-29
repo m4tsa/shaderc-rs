@@ -22,9 +22,12 @@ use std::path::{Path, PathBuf};
 static SHADERC_STATIC_LIB: &str = "shaderc_combined";
 static SHADERC_SHARED_LIB: &str = "shaderc_shared";
 static SHADERC_STATIC_LIB_FILE: &str = "libshaderc_combined.a";
+static SHADERC_STATIC_LIB_FILE_ANDROID: &str = "libshaderc.a";
 static SHADERC_STATIC_LIB_FILE_MSVC: &str = "shaderc_combined.lib";
 
 fn build_shaderc(shaderc_dir: &PathBuf, use_ninja: bool) -> PathBuf {
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+
     let mut config = cmake::Config::new(shaderc_dir);
     config
         .profile("Release")
@@ -35,6 +38,11 @@ fn build_shaderc(shaderc_dir: &PathBuf, use_ninja: bool) -> PathBuf {
         .define("CMAKE_INSTALL_LIBDIR", "lib");
     if use_ninja {
         config.generator("Ninja");
+    }
+    if target_os.as_str() == "android" {
+        config
+            .define("CMAKE_SYSTEM_NAME", "Android")
+            .define("BUILD_TESTING", "OFF");
     }
     config.build()
 }
@@ -147,6 +155,8 @@ fn main() {
         let combined_lib_path =
             search_dir.join(if target_os == "windows" && target_env == "msvc" {
                 SHADERC_STATIC_LIB_FILE_MSVC
+            } else if target_os == "android" {
+                SHADERC_STATIC_LIB_FILE_ANDROID
             } else {
                 SHADERC_STATIC_LIB_FILE
             });
@@ -203,6 +213,11 @@ fn main() {
                     }
                     println!("cargo:rustc-link-lib={}={}", kind, lib_name);
                     println!("cargo:rustc-link-lib=dylib=stdc++");
+                    return;
+                }
+                ("android", _) => {
+                    println!("cargo:rustc-link-search=native={}", search_dir_str);
+                    println!("cargo:rustc-link-lib=static=shaderc");
                     return;
                 }
                 ("windows", "msvc") => {
