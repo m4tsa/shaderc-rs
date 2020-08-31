@@ -156,7 +156,15 @@ fn main() {
             search_dir.join(if target_os == "windows" && target_env == "msvc" {
                 SHADERC_STATIC_LIB_FILE_MSVC
             } else if target_os == "android" {
-                SHADERC_STATIC_LIB_FILE_ANDROID
+                let arch = match env::var("CARGO_CFG_TARGET_ARCH").unwrap().as_str() {
+                    "x86" => "x86",
+                    "x86_64" => "x86_64",
+                    "arm" => "armeabi-v7a",
+                    "aarch64" => "arm64-v8a",
+                    arch => unimplemented!("Unsupported android arch: {}", arch)
+                };
+
+                Box::leak(format!("{}/{}", arch, SHADERC_STATIC_LIB_FILE_ANDROID).into_boxed_str())
             } else {
                 SHADERC_STATIC_LIB_FILE
             });
